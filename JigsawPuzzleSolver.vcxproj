@@ -54,7 +54,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>"..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\include";"..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\include\QtWidgets";"..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\include\QtGui";"..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\include\QtANGLE";"..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\include\QtCore";"release";..\..\..\Qt\Qt5.2.1\5.2.1\msvc2010\mkspecs\win32-msvc2010;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OPENCV_INCLUDE);$(QT_INCLUDE);$(QT_INCLUDE)\QtWidgets;$(QT_INCLUDE)\QtGui;$(QT_INCLUDE)\QtANGLE;$(QT_INCLUDE)\QtCore;debug;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Zm200 -w34100 -w34189 %(AdditionalOptions)</AdditionalOptions>
       <AssemblerListingLocation>release\</AssemblerListingLocation>
       <BrowseInformation>false</BrowseInformation>
@@ -70,7 +70,7 @@
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>qtmain.lib;C:\Qt\Qt5.2.1\5.2.1\msvc2010\lib\Qt5Widgets.lib;C:\Qt\Qt5.2.1\5.2.1\msvc2010\lib\Qt5Gui.lib;C:\Qt\Qt5.2.1\5.2.1\msvc2010\lib\Qt5Core.lib;libEGL.lib;libGLESv2.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(OPENCV_LIB)\opencv_core248.lib;$(OPENCV_LIB)\opencv_calib3d248.lib;$(OPENCV_LIB)\opencv_contrib248.lib;$(OPENCV_LIB)\opencv_features2d248.lib;$(OPENCV_LIB)\opencv_flann248.lib;$(OPENCV_LIB)\opencv_highgui248.lib;$(OPENCV_LIB)\opencv_imgproc248.lib;$(OPENCV_LIB)\opencv_legacy248.lib;$(OPENCV_LIB)\opencv_ml248.lib;$(OPENCV_LIB)\opencv_objdetect248.lib;$(OPENCV_LIB)\opencv_ocl248.lib;$(OPENCV_LIB)\opencv_photo248.lib;$(OPENCV_LIB)\opencv_stitching248.lib;$(OPENCV_LIB)\opencv_superres248.lib;$(OPENCV_LIB)\opencv_ts248.lib;$(OPENCV_LIB)\opencv_video248.lib;$(OPENCV_LIB)\opencv_videostab248.lib;$(OPENCV_LIB)\opencv_gpu248.lib;qtmain.lib;$(QT_LIB)\Qt5Widgets.lib;$(QT_LIB)\Qt5Gui.lib;$(QT_LIB)\Qt5Core.lib;libEGLd.lib;libGLESv2d.lib;gdi32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Qt\Qt5.2.1\5.2.1\msvc2010\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>"/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'" %(AdditionalOptions)</AdditionalOptions>
       <DataExecutionPrevention>true</DataExecutionPrevention>
