@@ -23,6 +23,7 @@ private slots:
     void uploadImageClicked();
     void uploadPuzzlePieceClicked();
 	void process();
+	void capture();
 
 public:
     MainDialog(QWidget *parent = 0);

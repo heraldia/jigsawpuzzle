@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <opencv2/video/background_segm.hpp>
 
 
 #define IMAGEWIDTH 400
@@ -20,8 +21,80 @@
 #define PUZZLEPIECEWIDTH 50
 #define PUZZLEPIECEHEIGHT 50
 
+#define IMAGE_THRESHOLD 225
+#define MASK_THRESHOLD 240
+#define AREA_THRESHOLD 100
+
+#define DEBUG 1
+#define PRESETBLOCKS 0
+
+
 using namespace std;
 using namespace cv;
+
+namespace{
+
+cv::Mat  extractImageFromBackground(cv::Mat inputImg)
+{
+	int inputWidth = inputImg.rows;
+	int inputHeight = inputImg.cols;	
+
+	cv::Mat grayImg;
+	cv::cvtColor(inputImg,grayImg, CV_BGR2GRAY);
+	cv::threshold(grayImg,grayImg,IMAGE_THRESHOLD,255,0);
+
+#if DEBUG
+	imshow("1Gray",grayImg);
+#endif
+	cv::Mat whiteBackground = cv::Mat(inputWidth,inputHeight,inputImg.type());
+	whiteBackground.setTo(cv::Scalar(255,255,255));
+
+#if DEBUG
+	imshow("2Input",inputImg);
+	imshow("3Background",whiteBackground);
+#endif
+	
+
+	Mat fgMaskMOG2 , output;
+	Ptr<BackgroundSubtractor> pMOG2;
+	pMOG2 = new BackgroundSubtractorMOG2();
+	pMOG2->operator()(whiteBackground, fgMaskMOG2);
+	pMOG2->operator()(grayImg, fgMaskMOG2);
+	cv::threshold(fgMaskMOG2,fgMaskMOG2,MASK_THRESHOLD,255,0);
+#if DEBUG
+	imshow("4Mask",fgMaskMOG2);
+#endif
+	std::cout << fgMaskMOG2.rows << fgMaskMOG2.cols;
+
+	inputImg.copyTo(output, fgMaskMOG2);
+
+	std::vector<std::vector<cv::Point> > contours;
+	std::vector<cv::Vec4i> hierarchy;
+
+	findContours(fgMaskMOG2,contours,hierarchy,cv::RETR_CCOMP, cv::CHAIN_APPROX_TC89_KCOS);
+
+	cv::Rect brect ;
+	for ( size_t i=0; i<contours.size(); ++i )
+	{		
+		brect = cv::boundingRect(contours[i]);
+		if(brect.area() > AREA_THRESHOLD)
+		{
+			cv::drawContours( output, contours, i, Scalar(0,255,0), 1, 8, hierarchy, 0, Point() ); 
+			break;		
+		}
+	}
+#if DEBUG
+	imshow("5Bounds",output);
+#endif
+	cv::Mat finalOutput = cv::Mat(inputImg, cv::Range(brect.y,brect.y+brect.height),cv::Range(brect.x,brect.x + brect.width));	
+#if DEBUG
+	imshow("6Extracted Image ",finalOutput);
+#endif
+	return finalOutput;
+
+}
+
+}
 
 MainDialog::MainDialog(QWidget *parent)
     : QDialog(parent)
@@ -44,24 +117,33 @@ MainDialog::MainDialog(QWidget *parent)
     gridLayout->addWidget(m_mainImage,0,2);
     mainLayout->addStretch();
 
+    /*phil 2014-4-26 22:07:56*/
+    QPushButton* captureImageButton = new QPushButton("Capture by camera");
+    connect(captureImageButton,SIGNAL(clicked()),this,SLOT(capture()));
+    gridLayout->addWidget(captureImageButton,1,0);
+//    m_puzzlePiece = new QLabel;
+//    m_puzzlePiece->setMaximumSize(QSize(IMAGEWIDTH,IMAGEHEIGHT));
+//    gridLayout->addWidget(m_puzzlePiece,1,1);
+    mainLayout->addStretch();
+
     QLabel* selectPuzzlePiece = new QLabel("Select a Puzzle Piece");
-    gridLayout->addWidget(selectPuzzlePiece,1,0);
+    gridLayout->addWidget(selectPuzzlePiece,2,0);
     m_selectPieceButton = new QPushButton("Choose..");
     m_selectPieceButton->setEnabled(false);
     connect(m_selectPieceButton,SIGNAL(clicked()),this,SLOT(uploadPuzzlePieceClicked()));
-    gridLayout->addWidget(m_selectPieceButton,1,1);
+    gridLayout->addWidget(m_selectPieceButton,2,1);
     m_puzzlePiece = new QLabel;
     m_puzzlePiece->setMaximumSize(QSize(IMAGEWIDTH,IMAGEHEIGHT));
-    gridLayout->addWidget(m_puzzlePiece,1,2);
+    gridLayout->addWidget(m_puzzlePiece,2,2);
     mainLayout->addStretch();
 
     m_detectButton = new QPushButton("Detect Position");
 	connect(m_detectButton,SIGNAL(clicked()),this,SLOT(process()));
     m_detectButton->setEnabled(false);
-    gridLayout->addWidget(m_detectButton,2,0,1,3,Qt::AlignHCenter);
+    gridLayout->addWidget(m_detectButton,3,0,2,3,Qt::AlignHCenter);
 
     m_result = new QLabel("");
-	gridLayout->addWidget(m_result,3,0,1,3,Qt::AlignCenter);
+	gridLayout->addWidget(m_result,5,0,4,3,Qt::AlignCenter);
 
     /*
     QVBoxLayout* mainLeftLayout = new QVBoxLayout(this);
@@ -83,7 +165,7 @@ MainDialog::~MainDialog()
 
 void MainDialog::uploadPuzzlePieceClicked()
 {
-	m_puzzlePiecePath = QFileDialog::getOpenFileName(this,tr("Select Puzzle Imaage"),"",tr("Images (*.png *.jpg)"));
+	m_puzzlePiecePath = QFileDialog::getOpenFileName(this,tr("Select Puzzle Image"),"",tr("Images (*.png *.jpg)"));
     if (!m_puzzlePiecePath.isEmpty())
     {
          QImage image(m_puzzlePiecePath);
@@ -101,7 +183,7 @@ void MainDialog::uploadPuzzlePieceClicked()
 void MainDialog::uploadImageClicked()
 {
 
-    m_wholeImagePath = QFileDialog::getOpenFileName(this,tr("Select Puzzle Imaage"),"",tr("Images (*.png *.jpg)"));
+    m_wholeImagePath = QFileDialog::getOpenFileName(this,tr("Select Puzzle Image"),"",tr("Images (*.png *.jpg)"));
     if (!m_wholeImagePath.isEmpty())
     {
          QImage image(m_wholeImagePath);
@@ -123,18 +205,35 @@ void MainDialog::uploadImageClicked()
 
 void MainDialog::process()
 {
+#if PRESETBLOCKS
 	int rowNum = 8; // number of pieces in each row
     int colNum = 8; // number of pieces in each col
+#endif
 	
 	
     //Define images to store each frame and results after match with the templates
     IplImage* temp1MatchResult;
-	
-    // Templates
-	IplImage* frame = cvLoadImage(m_wholeImagePath.toLocal8Bit(),1);   // whole image	
-	
-	IplImage* temp1 = cvLoadImage(m_puzzlePiecePath.toLocal8Bit(),1);       // piece image
+	 CvSize sz;  
+	 double scale = 1.0;  
 
+    // Templates
+	IplImage* frameO = cvLoadImage(m_wholeImagePath.toLocal8Bit(),1);   // whole image	
+	IplImage* frame ;
+
+	  sz.width = IMAGEWIDTH*scale;  
+        sz.height = IMAGEHEIGHT*scale;  
+        frame = cvCreateImage(sz,frameO->depth,frameO->nChannels);  
+        cvResize(frameO,frame,CV_INTER_CUBIC);  
+
+	//cvResize(frameO,frame,CV_INTER_CUBIC);
+	// cvShowImage("Jigsaw puzzles solver2", frame);
+//	 cvWaitKey(0);  
+
+	cv::Mat inputPiece = cv::imread(m_puzzlePiecePath.toStdString());
+
+	cv::Mat extractedPiece = extractImageFromBackground(inputPiece);
+
+	IplImage* temp1 = new IplImage(extractedPiece); // piece image
 
     // Initialize the images use to store the results after match with the templates
     int w1 = frame->width  - temp1->width  + 1;
@@ -147,10 +246,18 @@ void MainDialog::process()
 
     int rowUnitHeight =0;
     int colUnitWidth = 0;
+#if PRESETBLOCKS
     if (rowNum != 0 && colNum != 0){
         rowUnitHeight = w2/colNum;
         colUnitWidth = h2/rowNum;
     }
+#endif
+
+#if !PRESETBLOCKS
+    rowUnitHeight = temp1->height;
+    colUnitWidth = temp1->width;
+#endif
+    
 
     cout<<colUnitWidth<<" "<<rowUnitHeight<<endl;
 
@@ -164,7 +271,7 @@ void MainDialog::process()
     cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX, 1, 1.2, 0, 2);
 
     //Define window to display video 
-    cvNamedWindow("Jigsaw puzzles solver", 0);
+    cvNamedWindow("Jigsaw puzzles solver1", 0);
 
 //    assert(frame) ;
 
@@ -173,7 +280,7 @@ void MainDialog::process()
 
     if(temp1MatchResult){
         //Find a corner of the matched template to get the coordinates to draw the rectangles 
-        double min_val1=0, max_val1=0, min_val2=0, max_val2=0;
+        double min_val1=0, max_val1=0;
         CvPoint min_loc1, max_loc1;
 
         cvMinMaxLoc(temp1MatchResult, &min_val1, &max_val1, &min_loc1, &max_loc1);
@@ -182,7 +289,7 @@ void MainDialog::process()
         int offsetx = 0;
         int offsety = 0;
         //Draw red color rectangle around the bird //cvR
-        cvRectangle(frame,cvPoint(max_loc1.x+offsetx, max_loc1.y+offsety), cvPoint(max_loc1.x+offsetx+(temp1->width)*0.55, max_loc1.y+offsety+(temp1->height)*0.5), cvScalar(0, 255, 0 ), 2);
+        cvRectangle(frame,cvPoint(max_loc1.x+offsetx, max_loc1.y+offsety), cvPoint(max_loc1.x+offsetx+(temp1->width), max_loc1.y+offsety+(temp1->height)), cvScalar(0, 255, 0 ), 2);
 
 
         // Get the middle point of the ball template bottom edge
@@ -192,7 +299,7 @@ void MainDialog::process()
         cvCircle(frame, cvPoint(x,y), 3, cvScalar(0, 255, 0 ), CV_FILLED, 8, 0);
 
         //Display frame
-        cvShowImage("Jigsaw puzzles solver", frame);
+        cvShowImage("Jigsaw puzzles solver1", frame);
 
         // return the coordinates of each piece.
         int rowLocation =0;
@@ -210,8 +317,68 @@ void MainDialog::process()
 	
     //Free memory 
 
-    cvDestroyWindow( "Jigsaw puzzles solver" );
-	
-	
+   // cvDestroyWindow( "Jigsaw puzzles solver1" );
 
 }
+
+void MainDialog::capture()
+{
+    CvCapture* capture = 0;
+    Mat frame, frameCopy, image;
+
+    capture = cvCaptureFromCAM( CV_CAP_ANY ); //0=default, -1=any camera, 1..99=your camera
+    if( !capture )
+    {
+        cout << "No camera detected" << endl;
+    }
+
+    cvNamedWindow( "result", CV_WINDOW_AUTOSIZE );
+
+    if( capture )
+    {
+        cout << "In capture ..." << endl;
+        for(;;)
+        {
+            IplImage* iplImg = cvQueryFrame( capture );
+            frame = iplImg;
+
+            if( frame.empty() )
+                break;
+            if( iplImg->origin == IPL_ORIGIN_TL )
+                frame.copyTo( frameCopy );
+            else
+                flip( frame, frameCopy, 0 );
+
+            cvShowImage( "result", iplImg );
+
+            if( waitKey( 10 ) >= 0 ){
+                char save_path[80] = ".\\CapturedImage.jpg";  
+                
+                cvSaveImage(save_path, iplImg);  
+                break;
+            }
+		}
+            // waitKey(0);
+        }
+
+        cvReleaseCapture( &capture );
+        cvDestroyWindow( "result" );
+
+	m_puzzlePiecePath = ".\\CapturedImage.jpg";
+    if (!m_puzzlePiecePath.isEmpty())
+    {
+         QImage image(m_puzzlePiecePath);
+         if (image.isNull()) {
+             QMessageBox::information(this, tr("Image Viewer"),
+                                      tr("Cannot load %1.").arg(m_puzzlePiecePath));
+             return;
+         }
+         QPixmap pixmap1 = QPixmap::fromImage(image);
+         m_puzzlePiece->setPixmap(pixmap1.scaled(QSize(PUZZLEPIECEWIDTH, PUZZLEPIECEHEIGHT)));
+         m_detectButton->setEnabled(true);
+     }
+
+     return ;
+}
+
+

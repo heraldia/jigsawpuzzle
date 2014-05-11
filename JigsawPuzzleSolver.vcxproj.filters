@@ -27,23 +27,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="maindialog.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="maindialog.h">
       <Filter>Header Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="debug\moc_maindialog.cpp">
-      <Filter>Generated Files</Filter>
+    <ClCompile Include="maindialog.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="release\moc_maindialog.cpp">
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="debug\moc_maindialog.cpp">
       <Filter>Generated Files</Filter>
     </ClCompile>
   </ItemGroup>
